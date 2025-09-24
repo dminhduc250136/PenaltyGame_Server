@@ -47,7 +47,7 @@ public class PenaltyServer {
 
             boolean checkLogin = checkLogin(username, password);
 
-            out.writeObject(checkLogin ? "SUCCESS" : "FAILD");
+            out.writeObject(checkLogin ? "SUCCESS" : "FAILED");
             
         }
         catch(Exception e) {
@@ -70,5 +70,41 @@ public class PenaltyServer {
             return false;
         }
     }
+    
+    private int receiveChoice(DataInputStream in) throws IOException {
+        return in.readInt();
+    }
 
+    private void sendResult(DataOutputStream out, String result) throws IOException {
+        out.writeUTF(result);
+        out.flush();
+    }
+
+    private void handlePenaltyRound(Socket shooter, Socket keeper) throws IOException {
+        DataInputStream shooterIn = new DataInputStream(shooter.getInputStream());
+        DataOutputStream shooterOut = new DataOutputStream(shooter.getOutputStream());
+
+        DataInputStream keeperIn = new DataInputStream(keeper.getInputStream());
+        DataOutputStream keeperOut = new DataOutputStream(keeper.getOutputStream());
+
+        // Nhận lựa chọn
+        int shooterChoice = receiveChoice(shooterIn);
+        int keeperChoice = receiveChoice(keeperIn);
+
+        // Xử lý kết quả bằng controller
+        String result = checkResult(shooterChoice, keeperChoice);
+
+        // Trả kết quả cho cả 2
+        sendResult(shooterOut, result);
+        sendResult(keeperOut, result);
+    }
+
+    public static String checkResult(int shooterChoice, int keeperChoice) {
+        // shooterChoice và keeperChoice là số từ 1-6 (ứng với 6 ô)
+        if (shooterChoice == keeperChoice) {
+            return "SAVED";   // Thủ môn bắt được
+        } else {
+            return "GOAL";   // Ghi bàn
+        }
+    }
 }

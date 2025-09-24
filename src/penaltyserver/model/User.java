@@ -4,18 +4,28 @@
  * and open the template in the editor.
  */
 
-package penaltyclient.model;
-
+package penaltyserver.model;
+import java.io.*;
+import java.net.*;
+import java.sql.*;
 /**
  *
  * @author This PC
  */
 public class User {
+    private String name;
+    private Socket socket;
+    private int choice = -1;
 
-    /**
-     * @param args the command line arguments
-     */
-    public static void main(String args[]){
-        // TODO code application logic here
+    public User(String name, Socket socket) {
+        this.name = name;
+        this.socket = socket;
+    }
+
+    public void setChoice(int choice) { this.choice = choice; }
+    public int getChoice() { return choice; }
+
+    public PrintWriter getWriter() throws IOException {
+        return new PrintWriter(socket.getOutputStream(), true);
     }
 }

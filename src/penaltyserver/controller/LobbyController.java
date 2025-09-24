@@ -4,18 +4,28 @@
  * and open the template in the editor.
  */
 
-package penaltyclient.controller;
+package penaltyserver.controller;
+
+import java.io.IOException;
+import java.io.ObjectOutputStream;
+import java.util.*;
+import penaltyserver.model.SessionManager;
 
 /**
  *
  * @author This PC
  */
 public class LobbyController {
-
-    /**
-     * @param args the command line arguments
-     */
-    public static void main(String args[]){
-        // TODO code application logic here
+    
+    public LobbyController() {
+ 
     }
+    
+    public static void handleSendOnlineUsers(ObjectOutputStream out) throws IOException {
+        List<String> onlineUsers = SessionManager.getOnlineUsers();
+        out.writeObject(onlineUsers);
+        out.flush();
+
+    }
+    
 }

@@ -4,18 +4,33 @@
  * and open the template in the editor.
  */
 
-package penaltyclient.controller;
-
+package penaltyserver.controller;
+import java.sql.*;
+import penaltyserver.config.DBConnection;
+import penaltyserver.model.User;
 /**
  *
  * @author This PC
  */
 public class AuthController {
 
-    /**
-     * @param args the command line arguments
-     */
-    public static void main(String args[]){
-        // TODO code application logic here
+    public AuthController() {
     }
+
+    public static boolean checkLogin(User user) {
+        try(Connection conn = DBConnection.getConnection()) {
+            String sql = "SELECT * FROM users WHERE username = ? AND password = ?";
+            PreparedStatement ps = conn.prepareStatement(sql);
+            ps.setString(1, user.getUsername());
+            ps.setString(2, user.getPassword());
+            ResultSet rs = ps.executeQuery();
+            return rs.next();
+        }
+        catch(SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    
 }

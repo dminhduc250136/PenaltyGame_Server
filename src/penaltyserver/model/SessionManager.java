@@ -17,20 +17,24 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author This PC
  */
 public class SessionManager {
-    private static Map<String, Socket> onlineUsers = new ConcurrentHashMap<>();
+    private static Map<String, ClientHandler> sessions = new ConcurrentHashMap<>();
 
-    public static void addSession(String username, Socket socket) {
-        onlineUsers.put(username, socket);
+    public static void addSession(String username, ClientHandler handler) {
+        sessions.put(username, handler);
     }
     public static void removeSession(String username) {
-        onlineUsers.remove(username);
+        sessions.remove(username);
+    }
+    
+    public static ClientHandler getSession(String username) {
+        return sessions.get(username);
     }
     
     public static List<String> getOnlineUsers() {
-        return new ArrayList<>(onlineUsers.keySet());
+        return new ArrayList<>(sessions.keySet());
     }
     public static boolean isOnline(String username) {
-        return onlineUsers.containsKey(username);
+        return sessions.containsKey(username);
     }
 
 }

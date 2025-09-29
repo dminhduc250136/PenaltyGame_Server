@@ -10,6 +10,7 @@ import java.io.*;
 import java.net.*;
 import penaltyserver.controller.AuthController;
 import penaltyserver.controller.LobbyController;
+import penaltyserver.model.ClientHandler;
 import penaltyserver.model.SessionManager;
 import penaltyserver.model.User;
 /**
@@ -25,63 +26,14 @@ public class PenaltyServer {
             
             while(true) {
                 Socket socket = serverSocket.accept();
-                System.out.println("Client connected"); 
+                System.out.println("Client socket:" + socket); 
 
-                new Thread(() -> handleClient(socket)).start();
+                ClientHandler handler = new ClientHandler(socket);
+                handler.start();
             }
 
         }catch(IOException e) {
             e.printStackTrace();
         }
-    }
-    
-   
-    private static void handleClient(Socket socket) {
-        String username = null;
-        try (
-            ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
-            ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream())
-        ) {
-            username = (String) in.readObject();
-            String password = (String) in.readObject();
-            
-            User user = new User(username, password);
-            if (AuthController.checkLogin(user)) {
-                SessionManager.addSession(username, socket);
-                out.writeObject("SUCCESS");
-                out.flush();
-            } else {
-                out.writeObject("FAIL");
-                out.flush();
-                return; // kết thúc sớm
-            }
-            
-            
-            // doc du lieu client gui len
-            while(true) {
-                String command = (String) in.readObject();
-            // lay danh sach online users
-            
-                if(command.equals("GET_ONLINE_USERS")) {
-                    LobbyController.handleSendOnlineUsers(out);
-                }
-                else if(command.equals("LOGOUT")) {
-                    SessionManager.removeSession(username);
-                    break;
-                }
-            }
-            
-
-        }
-        catch(IOException e) {
-            
-            if(username != null) {
-                SessionManager.removeSession(username);
-            }
-        }
-        catch(Exception e) {
-            e.printStackTrace();
-        }
-
-    }
+    }  
 }

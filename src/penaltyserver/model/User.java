@@ -11,6 +11,7 @@ package penaltyserver.model;
  * @author This PC
  */
 public class User {
+    private int userId;
     private String username;
     private String password;
 
@@ -18,8 +19,16 @@ public class User {
         this.username = username;
         this.password = password;
     }   
-    
 
+    public int getUserId() {
+        return userId;
+    }
+
+    public void setUserId(int userId) {
+        this.userId = userId;
+    }
+    
+    
     public String getUsername() {
         return this.username;
     }

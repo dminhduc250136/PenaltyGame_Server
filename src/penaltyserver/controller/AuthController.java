@@ -24,7 +24,13 @@ public class AuthController {
             ps.setString(1, user.getUsername());
             ps.setString(2, user.getPassword());
             ResultSet rs = ps.executeQuery();
-            return rs.next();
+            if(rs.next()) {
+                int userId = rs.getInt("user_id");
+                user.setUserId(userId);
+                return true;
+            }
+            return false;
+            
         }
         catch(SQLException e) {
             e.printStackTrace();

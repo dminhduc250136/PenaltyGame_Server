@@ -12,7 +12,14 @@ import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import penaltyserver.model.ClientHandler;
+import penaltyserver.model.Match;
+import penaltyserver.model.MatchDAO;
+import penaltyserver.model.MatchResult;
+import penaltyserver.model.MatchResultDAO;
+import penaltyserver.model.PenaltyShotDAO;
 import penaltyserver.model.SessionManager;
+import penaltyserver.model.User;
+import penaltyserver.model.UserDAO;
 
 /**
  *
@@ -20,9 +27,7 @@ import penaltyserver.model.SessionManager;
  */
 public class LobbyController {
     
-    public LobbyController() {
- 
-    }
+    private static UserDAO userDAO;
     
     public static void handleSendOnlineUsers(ObjectOutputStream out) throws IOException {
         List<String> onlineUsers = SessionManager.getOnlineUsers();
@@ -30,46 +35,47 @@ public class LobbyController {
         out.flush();
 
     }
-    public static void handleInvite(String targetUser, ClientHandler handler, String username) {
-        ClientHandler targetHandler = SessionManager.getSession(targetUser);
-        
-        
-        System.out.println("Invite from " + username + " to " + targetUser);
-        System.out.println("Handler(A): " + handler);
-        System.out.println("Handler(B): " + targetHandler);
-        System.out.println("Equal? " + (handler == targetHandler));
+    
+    // A = nguoi moi, B = nguoi duoc moi
+    public static void handleInviteB(String bUsername, ClientHandler selfHandler, String selfUsername) {
+        ClientHandler bHandler = SessionManager.getSession(bUsername);
+
         // neu nguoi choi khong onl gui cho handler moi that bai
-        if (targetHandler == null) {
-            handler.sendMessage("INVITE_FAIL:");
-            System.out.println("Server sent to: " + handler + " " + username + " fail invite from if sence" );
+        if (bHandler == null) {
+            bHandler.sendMessage("INVITE_FAIL:");
+            System.out.println("Server sent to: " + selfHandler + " " + selfUsername + " fail invite from if sence" );
             return;
         }
         try {
             
             // gui thong bao moi cho b
-            targetHandler.sendMessage("INVITE_FROM:" + username);
-            System.out.println("Server sent to: " + targetHandler + " " + targetUser + " INVITE_FROM from try");
+            bHandler.sendMessage("INVITE_FROM:" + selfUsername);
+            System.out.println("Server sent to: " + bHandler + " " + bUsername + " INVITE_FROM from try");
             // neu moi thanh cong tra thong bao cho a
-            handler.sendMessage("INVITE_SUCCESS:");
-            System.out.println("Server sent to: " + handler + " " + username + " INVITE_SUCCESS from try");
+            selfHandler.sendMessage("INVITE_SUCCESS:");
+            System.out.println("Server sent to: " + selfHandler + " " + selfUsername + " INVITE_SUCCESS from try");
         }
         catch(Exception e) {
             // neu try loi tra fail ve cho a
-            handler.sendMessage("INVITE_FAIL:");
-            System.out.println("Server sent to handler" + username + "Invite fail from catch ");
+            selfHandler.sendMessage("INVITE_FAIL:");
+            System.out.println("Server sent to handler" + selfUsername + "Invite fail from catch ");
+        }
+    }
+    // B la nguoi moi, sau khi phan hoi thi tra thong bao ve cho B
+    public static void handleResponseInviteToB(String bUsername, User selfUser, boolean isAccept) {
+        ClientHandler bHandler = SessionManager.getSession(bUsername);
+        ClientHandler selfHandler = SessionManager.getSession(selfUser.getUsername());
+        if(bHandler == null) return;
+        
+        if(isAccept) {
+            bHandler.sendMessage("INVITE_RESPONSE_ACCEPT:" + selfUser.getUsername());
+            
+            MatchController.startMatch(bUsername, selfUser);
+        }
+        else {
+            bHandler.sendMessage("INVITE_RESPONSE_DECLINE:" + selfUser.getUsername());
         }
     }
     
-    public static void handleResponseInvite(String fromUser, String responder, boolean isAccept) {
-        ClientHandler fromUserHandler = SessionManager.getSession(fromUser);
-        if(fromUserHandler == null) return;
-        
-        if(isAccept) {
-            fromUserHandler.sendMessage("INVITE_RESPONSE_ACCEPT:" + responder);
-        }
-        else {
-            fromUserHandler.sendMessage("INVITE_RESPONSE_DECLINE:" + responder);
-        }
-    }
 }
     

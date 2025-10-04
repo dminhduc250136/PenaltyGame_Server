@@ -13,6 +13,7 @@ import java.net.Socket;
 import java.net.SocketException;
 import penaltyserver.controller.AuthController;
 import penaltyserver.controller.LobbyController;
+import penaltyserver.controller.MatchController;
 
 /**
  *
@@ -22,7 +23,7 @@ public class ClientHandler extends Thread {
     private Socket socket;
     private ObjectOutputStream out;
     private ObjectInputStream in;
-    
+    private User user;
     private String username;
     
     public ClientHandler(Socket socket) {
@@ -46,7 +47,7 @@ public class ClientHandler extends Thread {
                 if(obj instanceof String) {
                     String msg = (String) obj;
                     
-                    // split msg
+                    // split with form a:b a is command, b is data and can have many data like a:b:c
                     String[] parts = msg.split(":");
                     String command = parts[0];
                     
@@ -54,7 +55,7 @@ public class ClientHandler extends Thread {
                         case "LOGIN": {
                             this.username = parts[1];
                             String password = parts[2];
-                            User user = new User(username, password);
+                            user = new User(username, password);
             
                             if (AuthController.checkLogin(user)) {
                                 SessionManager.addSession(username, this);
@@ -82,20 +83,19 @@ public class ClientHandler extends Thread {
                             
                         case "INVITE":
                             String targetUsername = parts[1];
-                            LobbyController.handleInvite(targetUsername, this, username);
+                            LobbyController.handleInviteB(targetUsername, this, username);
                             break;
                             
                         case "INVITE_ACCEPT":
                             String fromUser = parts[1];
-                            LobbyController.handleResponseInvite(fromUser, username, true);
+                            LobbyController.handleResponseInviteToB(fromUser, user, true);
                             break;
                             
                             
                         case "INVITE_DECLINE":
                             String fromUser2 = parts[1];
-                            LobbyController.handleResponseInvite(fromUser2, username, false);
+                            LobbyController.handleResponseInviteToB(fromUser2, user, false);
                             break;
-                            
                         
                         default: System.out.println("Unknown command:" + msg);
                     }

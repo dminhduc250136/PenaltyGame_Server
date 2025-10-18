@@ -1,157 +1,267 @@
 package penaltyserver.controller;
-import java.io.*;
-import java.net.*;
+
 import java.util.*;
+import penaltyserver.PenaltyServer;
+import penaltyserver.model.Player;
 
 public class MatchController {
-    private static final int PORT = 12345;
-    private static final int MAX_TURNS = 5;  // mỗi đội 5 lượt sút
-
-    private PlayerHandler player1, player2;
-    private int currentTurn = 0; // 0..9
-    private Timer timer;
-
-    public static void main(String[] args) throws IOException {
-        new MatchController().start();
+    private ServerNetwork server;
+    private Map<String, Match> activeMatches;
+    private Queue<Player> waitingPlayers;
+    
+    public MatchController(ServerNetwork server) {
+        this.server = server;
+        this.activeMatches = new HashMap<>();
+        this.waitingPlayers = new LinkedList<>();
     }
-
-    public void start() throws IOException {
-        ServerSocket serverSocket = new ServerSocket(PORT);
-        System.out.println("Server started, waiting for 2 players...");
-
-        Socket s1 = serverSocket.accept();
-        player1 = new PlayerHandler(s1, "P1");
-        new Thread(player1).start();
-
-        Socket s2 = serverSocket.accept();
-        player2 = new PlayerHandler(s2, "P2");
-        new Thread(player2).start();
-
-        System.out.println("Both players connected!");
-        startMatch();
-    }
-
-    // Bắt đầu trận đấu
-    private void startMatch() {
-        nextTurn();
-    }
-
-    // Xử lý từng lượt
-    private void nextTurn() {
-        if (currentTurn >= MAX_TURNS * 2) {
-            broadcast("GAMEOVER");
-            return;
+    
+    public void handlePlayerJoinQueue(Player player) {
+        waitingPlayers.add(player);
+        System.out.println("Player " + player.getName() + " joined queue. Queue size: " + waitingPlayers.size());
+        
+        // Try to create a match if we have 2 players
+        if (waitingPlayers.size() >= 2) {
+            createMatch();
         }
-
-        // Xác định ai sút, ai làm GK
-        boolean p1Shoots = (currentTurn % 2 == 0); // lượt chẵn: P1 sút
-        player1.setShooter(p1Shoots);
-        player2.setShooter(!p1Shoots);
-
-        player1.send("ROLE:" + (p1Shoots ? "SHOOTER" : "KEEPER"));
-        player2.send("ROLE:" + (p1Shoots ? "KEEPER" : "SHOOTER"));
-
-        broadcast("RESET:");
-
-        startTimer();
     }
-
-    // Đếm ngược 10s, hết giờ random
-    private void startTimer() {
-        timer = new Timer();
-        TimerTask task = new TimerTask() {
-            int timeLeft = 10;
-
-            @Override
-            public void run() {
-                broadcast("TIMER:" + timeLeft);
-                if (timeLeft <= 0) {
-                    timer.cancel();
-                    resolveTurn();
-                }
-                timeLeft--;
+    
+    private void createMatch() {
+        Player player1 = waitingPlayers.poll();
+        Player player2 = waitingPlayers.poll();
+        
+        if (player1 == null || player2 == null) return;
+        
+        String matchId = UUID.randomUUID().toString();
+        Match match = new Match(matchId, player1, player2);
+        
+        activeMatches.put(matchId, match);
+        player1.setMatchId(matchId);
+        player2.setMatchId(matchId);
+        
+        System.out.println("Match created: " + player1.getName() + " vs " + player2.getName());
+        
+        // Start match
+        match.startMatch();
+    }
+    
+    public void handlePlayerChoice(Player player, int zoneChoice) {
+        String matchId = player.getMatchId();
+        Match match = activeMatches.get(matchId);
+        
+        if (match != null) {
+            match.registerChoice(player, zoneChoice);
+        }
+    }
+    
+    public void handlePlayerDisconnect(Player player) {
+        String matchId = player.getMatchId();
+        if (matchId != null) {
+            Match match = activeMatches.get(matchId);
+            if (match != null) {
+                match.handleDisconnect(player);
+                activeMatches.remove(matchId);
             }
-        };
-        timer.scheduleAtFixedRate(task, 0, 1000);
+        }
+        
+        // Remove from waiting queue if present
+        waitingPlayers.remove(player);
     }
-
-    // Sau khi cả 2 chọn (hoặc hết giờ)
-    private void resolveTurn() {
-        int shooterChoice = player1.isShooter() ? player1.getChoice() : player2.getChoice();
-        int keeperChoice = player1.isShooter() ? player2.getChoice() : player1.getChoice();
-
-        // random nếu chưa chọn
-        if (shooterChoice == -1) shooterChoice = new Random().nextInt(6);
-        if (keeperChoice == -1) keeperChoice = new Random().nextInt(6);
-
-        boolean goal = shooterChoice != keeperChoice;
-
-        String shooterId = player1.isShooter() ? "P1" : "P2";
-        broadcast("RESULT:" + shooterId + ":" + (currentTurn / 2) + ":" + (goal ? "GOAL" : "MISS"));
-
-        // Reset choice
-        player1.resetChoice();
-        player2.resetChoice();
-
-        currentTurn++;
-        nextTurn();
-    }
-
-    private void broadcast(String msg) {
-        player1.send(msg);
-        player2.send(msg);
-    }
-
-    // ================== Inner Class ==================
-    private class PlayerHandler implements Runnable {
-        private Socket socket;
-        private PrintWriter out;
-        private BufferedReader in;
-        private String id;
-        private boolean shooter;
-        private int choice = -1;
-
-        public PlayerHandler(Socket socket, String id) {
-            this.socket = socket;
-            this.id = id;
+    
+    // Inner class representing a match between two players
+    private class Match {
+        private String matchId;
+        private Player player1;
+        private Player player2;
+        
+        private Player currentShooter;
+        private Player currentKeeper;
+        
+        private int player1Score = 0;
+        private int player2Score = 0;
+        private int currentRound = 1;
+        private int maxRounds = 5;
+        
+        private Integer shooterChoice = null;
+        private Integer keeperChoice = null;
+        
+        public Match(String matchId, Player player1, Player player2) {
+            this.matchId = matchId;
+            this.player1 = player1;
+            this.player2 = player2;
         }
-
-        public void setShooter(boolean shooter) {
-            this.shooter = shooter;
-        }
-
-        public boolean isShooter() {
-            return shooter;
-        }
-
-        public int getChoice() {
-            return choice;
-        }
-
-        public void resetChoice() {
-            choice = -1;
-        }
-
-        public void send(String msg) {
-            out.println(msg);
-        }
-
-        @Override
-        public void run() {
+        
+        public void startMatch() {
+            // Randomly choose who shoots first
+            if (Math.random() < 0.5) {
+                currentShooter = player1;
+                currentKeeper = player2;
+            } else {
+                currentShooter = player2;
+                currentKeeper = player1;
+            }
+            
+            // Notify both players
+            server.sendToPlayer(player1, "MATCH_START|" + player2.getName() + "|" + currentShooter.getName());
+            server.sendToPlayer(player2, "MATCH_START|" + player1.getName() + "|" + currentShooter.getName());
+            
+            System.out.println("Match started: " + currentShooter.getName() + " shoots first");
+            
+            // Start first turn after delay
             try {
-                in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                out = new PrintWriter(socket.getOutputStream(), true);
-
-                String line;
-                while ((line = in.readLine()) != null) {
-                    if (line.startsWith("CHOICE:")) {
-                        choice = Integer.parseInt(line.split(":")[1]);
-                        System.out.println(id + " chọn ô " + choice);
-                    }
-                }
-            } catch (IOException e) {
+                Thread.sleep(3000);
+            } catch (InterruptedException e) {
                 e.printStackTrace();
             }
+            
+            startTurn();
+        }
+        
+        private void startTurn() {
+            shooterChoice = null;
+            keeperChoice = null;
+            
+            // Notify shooter
+            server.sendToPlayer(currentShooter, "TURN_START|" + currentRound + "|SHOOTER");
+            
+            // Notify keeper
+            server.sendToPlayer(currentKeeper, "TURN_START|" + currentRound + "|GOALKEEPER");
+            
+            System.out.println("Round " + currentRound + ": " + currentShooter.getName() + " shoots, " + currentKeeper.getName() + " keeps");
+            
+            // Start timer for choices (10 seconds)
+            Timer timer = new Timer();
+            timer.schedule(new TimerTask() {
+                @Override
+                public void run() {
+                    // Auto-submit random choices if not received
+                    synchronized (Match.this) {
+                        if (shooterChoice == null) {
+                            shooterChoice = (int)(Math.random() * 6);
+                            System.out.println(currentShooter.getName() + " timeout - random zone: " + shooterChoice);
+                        }
+                        if (keeperChoice == null) {
+                            keeperChoice = (int)(Math.random() * 6);
+                            System.out.println(currentKeeper.getName() + " timeout - random zone: " + keeperChoice);
+                        }
+                        
+                        if (shooterChoice != null && keeperChoice != null) {
+                            processTurn();
+                        }
+                    }
+                }
+            }, 10000);
+        }
+        
+        public synchronized void registerChoice(Player player, int zone) {
+            if (player.equals(currentShooter)) {
+                if (shooterChoice == null) {
+                    shooterChoice = zone;
+                    System.out.println(currentShooter.getName() + " chose zone: " + zone);
+                }
+            } else if (player.equals(currentKeeper)) {
+                if (keeperChoice == null) {
+                    keeperChoice = zone;
+                    System.out.println(currentKeeper.getName() + " chose zone: " + zone);
+                }
+            }
+            
+            // If both choices received, process immediately
+            if (shooterChoice != null && keeperChoice != null) {
+                processTurn();
+            }
+        }
+        
+        private void processTurn() {
+            // Determine if goal or save
+            boolean isGoal = (shooterChoice != keeperChoice);
+            
+            // Update score
+            if (isGoal) {
+                if (currentShooter.equals(player1)) {
+                    player1Score++;
+                } else {
+                    player2Score++;
+                }
+            }
+            
+            System.out.println("Result: Shooter zone " + shooterChoice + ", Keeper zone " + keeperChoice + " -> " + (isGoal ? "GOAL" : "SAVE"));
+            System.out.println("Score: " + player1.getName() + " " + player1Score + " - " + player2Score + " " + player2.getName());
+            
+            // Send result to both players
+            // Format: TURN_RESULT|shooterZone|keeperZone|isGoal|myScore|opponentScore|shooterName
+            String resultP1 = "TURN_RESULT|" + shooterChoice + "|" + keeperChoice + "|" + isGoal + "|" + 
+                            player1Score + "|" + player2Score + "|" + currentShooter.getName();
+            String resultP2 = "TURN_RESULT|" + shooterChoice + "|" + keeperChoice + "|" + isGoal + "|" + 
+                            player2Score + "|" + player1Score + "|" + currentShooter.getName();
+            
+            server.sendToPlayer(player1, resultP1);
+            server.sendToPlayer(player2, resultP2);
+            
+            // Wait for animation to finish
+            try {
+                Thread.sleep(3000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            
+            // Swap shooter and keeper for next turn
+            Player temp = currentShooter;
+            currentShooter = currentKeeper;
+            currentKeeper = temp;
+            
+            // After both players have had a turn, increment round
+            // Player who started second will shoot again = new round starts
+            if (currentShooter.equals(player1) ? currentRound > 1 : currentRound >= 1) {
+                currentRound++;
+            }
+            
+            // Check if we've completed all rounds
+            if (currentRound > maxRounds) {
+                checkMatchEnd();
+            } else {
+                startTurn();
+            }
+        }
+        
+        private void checkMatchEnd() {
+            // After 5 rounds (10 turns), check winner
+            if (player1Score > player2Score) {
+                endMatch(player1);
+            } else if (player2Score > player1Score) {
+                endMatch(player2);
+            } else {
+                // Tied - sudden death
+                System.out.println("Match tied! Going to sudden death...");
+                maxRounds++;
+                startTurn();
+            }
+        }
+        
+        private void endMatch(Player winner) {
+            System.out.println("Match ended! Winner: " + winner.getName());
+            
+            // Notify both players
+            server.sendToPlayer(player1, "MATCH_END|" + winner.getName() + "|" + 
+                              player1Score + "|" + player2Score);
+            server.sendToPlayer(player2, "MATCH_END|" + winner.getName() + "|" + 
+                              player2Score + "|" + player1Score);
+            
+            // Clean up
+            player1.setMatchId(null);
+            player2.setMatchId(null);
+            activeMatches.remove(matchId);
+        }
+        
+        public void handleDisconnect(Player disconnectedPlayer) {
+            Player otherPlayer = disconnectedPlayer.equals(player1) ? player2 : player1;
+            
+            // Notify other player
+            server.sendToPlayer(otherPlayer, "OPPONENT_DISCONNECTED");
+            
+            // End match
+            System.out.println("Player " + disconnectedPlayer.getName() + " disconnected from match");
+            
+            otherPlayer.setMatchId(null);
         }
     }
 }

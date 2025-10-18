@@ -25,7 +25,7 @@ public class PenaltyServer {
             
             while(true) {
                 Socket socket = serverSocket.accept();
-                System.out.println("Client connected");
+                System.out.println("Có 1 client đang kết nối...");
 
                 new Thread(() -> handleClient(socket)).start();
             }
@@ -105,6 +105,34 @@ public class PenaltyServer {
             return "SAVED";   // Thủ môn bắt được
         } else {
             return "GOAL";   // Ghi bàn
+        }
+    }
+    private static class ClientHandler implements Runnable {
+        private Socket socket;
+        private ObjectOutputStream out;
+        private ObjectInputStream in;
+
+        public ClientHandler(Socket socket) {
+            this.socket = socket;
+        }
+
+        @Override
+        public void run() {
+            try {
+                out = new ObjectOutputStream(socket.getOutputStream());
+                in = new ObjectInputStream(socket.getInputStream());
+
+                while (true) {
+                    Object obj = in.readObject();
+                    System.out.println("Received from client: " + obj);
+
+                    // Xử lý logic game, ví dụ echo lại
+                    out.writeObject("Server received: " + obj);
+                    out.flush();
+                }
+            } catch (Exception e) {
+                System.out.println("Client disconnected: " + e.getMessage());
+            }
         }
     }
 }

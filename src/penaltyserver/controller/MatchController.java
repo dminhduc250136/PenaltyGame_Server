@@ -1,23 +1,24 @@
 package penaltyserver.controller;
 
+import java.io.ObjectOutputStream;
 import java.util.*;
 import penaltyserver.PenaltyServer;
-import penaltyserver.model.Player;
+import penaltyserver.model.User;
 
 public class MatchController {
-    private ServerNetwork server;
+    private PenaltyServer server;
     private Map<String, Match> activeMatches;
-    private Queue<Player> waitingPlayers;
+    private Queue<User> waitingPlayers;
     
-    public MatchController(ServerNetwork server) {
+    public MatchController(PenaltyServer server) {
         this.server = server;
         this.activeMatches = new HashMap<>();
         this.waitingPlayers = new LinkedList<>();
     }
     
-    public void handlePlayerJoinQueue(Player player) {
-        waitingPlayers.add(player);
-        System.out.println("Player " + player.getName() + " joined queue. Queue size: " + waitingPlayers.size());
+    public void handlePlayerJoinQueue(User user) {
+        waitingPlayers.add(user);
+        System.out.println("User " + user.getUsername() + " joined queue. Queue size: " + waitingPlayers.size());
         
         // Try to create a match if we have 2 players
         if (waitingPlayers.size() >= 2) {
@@ -26,8 +27,8 @@ public class MatchController {
     }
     
     private void createMatch() {
-        Player player1 = waitingPlayers.poll();
-        Player player2 = waitingPlayers.poll();
+        User player1 = waitingPlayers.poll();
+        User player2 = waitingPlayers.poll();
         
         if (player1 == null || player2 == null) return;
         
@@ -38,43 +39,43 @@ public class MatchController {
         player1.setMatchId(matchId);
         player2.setMatchId(matchId);
         
-        System.out.println("Match created: " + player1.getName() + " vs " + player2.getName());
+        System.out.println("Match created: " + player1.getUsername() + " vs " + player2.getUsername());
         
         // Start match
         match.startMatch();
     }
     
-    public void handlePlayerChoice(Player player, int zoneChoice) {
-        String matchId = player.getMatchId();
+    public void handlePlayerChoice(User user, int zoneChoice) {
+        String matchId = user.getMatchId();
         Match match = activeMatches.get(matchId);
         
         if (match != null) {
-            match.registerChoice(player, zoneChoice);
+            match.registerChoice(user, zoneChoice);
         }
     }
     
-    public void handlePlayerDisconnect(Player player) {
-        String matchId = player.getMatchId();
+    public void handlePlayerDisconnect(User user) {
+        String matchId = user.getMatchId();
         if (matchId != null) {
             Match match = activeMatches.get(matchId);
             if (match != null) {
-                match.handleDisconnect(player);
+                match.handleDisconnect(user);
                 activeMatches.remove(matchId);
             }
         }
         
         // Remove from waiting queue if present
-        waitingPlayers.remove(player);
+        waitingPlayers.remove(user);
     }
     
     // Inner class representing a match between two players
     private class Match {
         private String matchId;
-        private Player player1;
-        private Player player2;
+        private User player1;
+        private User player2;
         
-        private Player currentShooter;
-        private Player currentKeeper;
+        private User currentShooter;
+        private User currentKeeper;
         
         private int player1Score = 0;
         private int player2Score = 0;
@@ -84,7 +85,7 @@ public class MatchController {
         private Integer shooterChoice = null;
         private Integer keeperChoice = null;
         
-        public Match(String matchId, Player player1, Player player2) {
+        public Match(String matchId, User player1, User player2) {
             this.matchId = matchId;
             this.player1 = player1;
             this.player2 = player2;
@@ -101,10 +102,10 @@ public class MatchController {
             }
             
             // Notify both players
-            server.sendToPlayer(player1, "MATCH_START|" + player2.getName() + "|" + currentShooter.getName());
-            server.sendToPlayer(player2, "MATCH_START|" + player1.getName() + "|" + currentShooter.getName());
+            server.sendToPlayer(player1, "MATCH_START|" + player2.getUsername() + "|" + currentShooter.getUsername());
+            server.sendToPlayer(player2, "MATCH_START|" + player1.getUsername() + "|" + currentShooter.getUsername());
             
-            System.out.println("Match started: " + currentShooter.getName() + " shoots first");
+            System.out.println("Match started: " + currentShooter.getUsername() + " shoots first");
             
             // Start first turn after delay
             try {
@@ -126,7 +127,7 @@ public class MatchController {
             // Notify keeper
             server.sendToPlayer(currentKeeper, "TURN_START|" + currentRound + "|GOALKEEPER");
             
-            System.out.println("Round " + currentRound + ": " + currentShooter.getName() + " shoots, " + currentKeeper.getName() + " keeps");
+            System.out.println("Round " + currentRound + ": " + currentShooter.getUsername() + " shoots, " + currentKeeper.getUsername() + " keeps");
             
             // Start timer for choices (10 seconds)
             Timer timer = new Timer();
@@ -137,11 +138,11 @@ public class MatchController {
                     synchronized (Match.this) {
                         if (shooterChoice == null) {
                             shooterChoice = (int)(Math.random() * 6);
-                            System.out.println(currentShooter.getName() + " timeout - random zone: " + shooterChoice);
+                            System.out.println(currentShooter.getUsername() + " timeout - random zone: " + shooterChoice);
                         }
                         if (keeperChoice == null) {
                             keeperChoice = (int)(Math.random() * 6);
-                            System.out.println(currentKeeper.getName() + " timeout - random zone: " + keeperChoice);
+                            System.out.println(currentKeeper.getUsername() + " timeout - random zone: " + keeperChoice);
                         }
                         
                         if (shooterChoice != null && keeperChoice != null) {
@@ -152,16 +153,16 @@ public class MatchController {
             }, 10000);
         }
         
-        public synchronized void registerChoice(Player player, int zone) {
-            if (player.equals(currentShooter)) {
+        public synchronized void registerChoice(User user, int zone) {
+            if (user.equals(currentShooter)) {
                 if (shooterChoice == null) {
                     shooterChoice = zone;
-                    System.out.println(currentShooter.getName() + " chose zone: " + zone);
+                    System.out.println(currentShooter.getUsername() + " chose zone: " + zone);
                 }
-            } else if (player.equals(currentKeeper)) {
+            } else if (user.equals(currentKeeper)) {
                 if (keeperChoice == null) {
                     keeperChoice = zone;
-                    System.out.println(currentKeeper.getName() + " chose zone: " + zone);
+                    System.out.println(currentKeeper.getUsername() + " chose zone: " + zone);
                 }
             }
             
@@ -185,14 +186,14 @@ public class MatchController {
             }
             
             System.out.println("Result: Shooter zone " + shooterChoice + ", Keeper zone " + keeperChoice + " -> " + (isGoal ? "GOAL" : "SAVE"));
-            System.out.println("Score: " + player1.getName() + " " + player1Score + " - " + player2Score + " " + player2.getName());
+            System.out.println("Score: " + User1.getUsername() + " " + player1Score + " - " + player2Score + " " + player2.getUsername());
             
             // Send result to both players
             // Format: TURN_RESULT|shooterZone|keeperZone|isGoal|myScore|opponentScore|shooterName
             String resultP1 = "TURN_RESULT|" + shooterChoice + "|" + keeperChoice + "|" + isGoal + "|" + 
-                            player1Score + "|" + player2Score + "|" + currentShooter.getName();
+                            player1Score + "|" + player2Score + "|" + currentShooter.getUsername();
             String resultP2 = "TURN_RESULT|" + shooterChoice + "|" + keeperChoice + "|" + isGoal + "|" + 
-                            player2Score + "|" + player1Score + "|" + currentShooter.getName();
+                            player2Score + "|" + player1Score + "|" + currentShooter.getUsername();
             
             server.sendToPlayer(player1, resultP1);
             server.sendToPlayer(player2, resultP2);
@@ -205,12 +206,12 @@ public class MatchController {
             }
             
             // Swap shooter and keeper for next turn
-            Player temp = currentShooter;
+            User temp = currentShooter;
             currentShooter = currentKeeper;
             currentKeeper = temp;
             
             // After both players have had a turn, increment round
-            // Player who started second will shoot again = new round starts
+            // User who started second will shoot again = new round starts
             if (currentShooter.equals(player1) ? currentRound > 1 : currentRound >= 1) {
                 currentRound++;
             }
@@ -237,13 +238,13 @@ public class MatchController {
             }
         }
         
-        private void endMatch(Player winner) {
-            System.out.println("Match ended! Winner: " + winner.getName());
+        private void endMatch(User winner) {
+            System.out.println("Match ended! Winner: " + winner.getUsername());
             
             // Notify both players
-            server.sendToPlayer(player1, "MATCH_END|" + winner.getName() + "|" + 
+            server.sendToPlayer(player1, "MATCH_END|" + winner.getUsername() + "|" + 
                               player1Score + "|" + player2Score);
-            server.sendToPlayer(player2, "MATCH_END|" + winner.getName() + "|" + 
+            server.sendToPlayer(player2, "MATCH_END|" + winner.getUsername() + "|" + 
                               player2Score + "|" + player1Score);
             
             // Clean up
@@ -252,14 +253,14 @@ public class MatchController {
             activeMatches.remove(matchId);
         }
         
-        public void handleDisconnect(Player disconnectedPlayer) {
-            Player otherPlayer = disconnectedPlayer.equals(player1) ? player2 : player1;
+        public void handleDisconnect(User disconnectedPlayer) {
+            User otherPlayer = disconnectedPlayer.equals(player1) ? player2 : player1;
             
-            // Notify other player
+            // Notify other user
             server.sendToPlayer(otherPlayer, "OPPONENT_DISCONNECTED");
             
             // End match
-            System.out.println("Player " + disconnectedPlayer.getName() + " disconnected from match");
+            System.out.println("User " + disconnectedPlayer.getUsername() + " disconnected from match");
             
             otherPlayer.setMatchId(null);
         }

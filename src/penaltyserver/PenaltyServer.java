@@ -18,7 +18,7 @@ import penaltyserver.model.User;
  * @author This PC
  */
 public class PenaltyServer {
-    private static final int SERVER_PORT = 12345;
+    private static final int SERVER_PORT = 12346;
     
     public static void main(String[] args) {
         try(ServerSocket serverSocket = new ServerSocket(SERVER_PORT)) {

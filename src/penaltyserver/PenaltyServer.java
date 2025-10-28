@@ -1,9 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-
 package penaltyserver;
 
 import java.io.*;
@@ -18,7 +12,7 @@ import penaltyserver.model.User;
  * @author This PC
  */
 public class PenaltyServer {
-    private static final int SERVER_PORT = 12346;
+    private static final int SERVER_PORT = 12345;
     
     public static void main(String[] args) {
         try(ServerSocket serverSocket = new ServerSocket(SERVER_PORT)) {
@@ -35,5 +29,5 @@ public class PenaltyServer {
         }catch(IOException e) {
             e.printStackTrace();
         }
-    }  
+    }
 }

@@ -68,22 +68,20 @@ public class ClientHandler extends Thread {
                             }
                             break;
 
-                        }
-                                                    
+                        }                     
                         case "LOGOUT": {
                             SessionManager.removeSession(username);
+                            System.out.println(username + "dang xuat");
                             break;
                         }
-                            
-                        
                         case "GET_ONLINE_USERS":
                             LobbyController.handleSendOnlineUsers(out);
+                            System.out.println(username + "đang online");
                             break;
-                            
-                            
                         case "INVITE":
                             String targetUsername = parts[1];
                             LobbyController.handleInviteB(targetUsername, this, username);
+                            System.out.println(username + "mời" + targetUsername);
                             break;
                             
                         case "INVITE_ACCEPT":
@@ -116,8 +114,6 @@ public class ClientHandler extends Thread {
         }
         
     }
-    
-
     public void sendMessage(String msg) {
         try {
             this.out.writeObject(msg);
@@ -126,8 +122,5 @@ public class ClientHandler extends Thread {
         catch(Exception e) {
             e.printStackTrace();
         }
-        
-    }
-    
-    
+    }   
 }

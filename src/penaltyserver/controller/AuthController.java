@@ -37,10 +37,4 @@ public class AuthController {
             return false;
         }
     }
-
-    
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> origin/main

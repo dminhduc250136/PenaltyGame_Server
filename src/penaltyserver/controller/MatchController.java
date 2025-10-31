@@ -345,7 +345,7 @@ public class MatchController {
         user.setCurrentMatchId(null); // Reset matchId người disconnect
         System.out.println("Match [" + matchId + "] removed due to disconnect.");
     }
-    
+
     // Inner class representing a match between two players
     private static MatchDAO matchDAO = new MatchDAO();
     private static MatchResultDAO mrDAO = new MatchResultDAO();

@@ -167,14 +167,14 @@ public class MatchController {
             if (match.getShooterChoice() == null) {
                 match.setShooterChoice(zoneChoice);
                 System.out.println("Match [" + matchId + "]: " + currentShooter.getUsername() + " chose zone " + zoneChoice);
-                match.sendToPlayer(currentKeeper, "WAITING_FOR_OPPONENT");
+                match.sendToPlayer(currentShooter, "WAITING_FOR_OPPONENT");
                 choiceRegistered = true;
             }
         } else if (user.equals(currentKeeper)) {
             if (match.getKeeperChoice() == null) {
                 match.setKeeperChoice(zoneChoice);
                 System.out.println("Match [" + matchId + "]: " + currentKeeper.getUsername() + " chose zone " + zoneChoice);
-                match.sendToPlayer(currentShooter, "WAITING_FOR_OPPONENT");
+                match.sendToPlayer(currentKeeper, "WAITING_FOR_OPPONENT");
                 choiceRegistered = true;
             }
         } else {
@@ -248,13 +248,17 @@ public class MatchController {
             if (roundCompleted && match.getPlayer1Score() != match.getPlayer2Score()) {
                 endMatch(match, match.getPlayer1Score() > match.getPlayer2Score() ? match.getPlayer1() : match.getPlayer2());
             } else {
+                if (roundCompleted) {
+                    match.setCurrentRound(match.getCurrentRound() + 1); // Vẫn tăng round trong sudden death
+                }
                 swapRolesAndNextTurn(match);
             }
         } else { // Normal rounds
-            if (match.getCurrentRound() > match.getMaxNormalRounds() && roundCompleted) {
+            if (match.getCurrentRound() == match.getMaxNormalRounds() && roundCompleted) {
                 if (match.getPlayer1Score() == match.getPlayer2Score()) {
                     match.setSuddenDeath(true);
                     System.out.println("Match [" + match.getMatchId() + "] entering Sudden Death.");
+                    match.setCurrentRound(match.getCurrentRound() + 1); 
                     swapRolesAndNextTurn(match);
                 } else {
                     endMatch(match, match.getPlayer1Score() > match.getPlayer2Score() ? match.getPlayer1() : match.getPlayer2());

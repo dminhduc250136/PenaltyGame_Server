@@ -20,7 +20,7 @@ import penaltyserver.model.PenaltyShotDAO;
 import penaltyserver.model.SessionManager;
 import penaltyserver.model.User;
 import penaltyserver.model.UserDAO;
-
+import share.ServerListResponse;
 /**
  *
  * @author This PC
@@ -35,11 +35,22 @@ public class LobbyController {
     
     public static void handleSendOnlineUsers(ObjectOutputStream out) throws IOException {
         List<String> onlineUsers = SessionManager.getOnlineUsers();
-        out.writeObject(onlineUsers);
+        ServerListResponse response = new ServerListResponse(ServerListResponse.UPDATE_ONLINE_USERS, onlineUsers);
+        
+        out.writeObject(response);
         out.flush();
         System.out.println("sent online list!");
         System.out.println(onlineUsers);
     }
+    
+    public static void handleSendMatchHistory(ObjectOutputStream out) {
+        
+    }
+    
+    public static void handleSendRanking(ObjectOutputStream out) {
+        
+    }
+    
     
     // A = nguoi moi, B = nguoi duoc moi
     public static void handleInviteB(String bUsername, ClientHandler selfHandler, String selfUsername) {

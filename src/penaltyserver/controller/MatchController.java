@@ -22,8 +22,21 @@ public class MatchController {
     }
     
     public void createAndStartMatch(User player1, User player2) {
-        String matchId = UUID.randomUUID().toString(); // Tạo ID trận đấu duy nhất
+        
+        String matchId = String.valueOf(matchDAO.createMatch(player1.getUserId()));
+        
+        if (matchId.equals("-1")) {
+            System.err.println("Error creating match in database.");
+            // Gửi lỗi về cho người chơi
+            ClientHandler handler1 = SessionManager.getSession(player1.getUsername());
+            ClientHandler handler2 = SessionManager.getSession(player2.getUsername());
+            if(handler1 != null) handler1.sendMessage("MATCH_FAIL:Server database error");
+            if(handler2 != null) handler2.sendMessage("MATCH_FAIL:Server database error");
+            return;
+        }
 
+        mrDAO.addPlayerToMatch(Integer.parseInt(matchId), player1.getUserId());
+        mrDAO.addPlayerToMatch(Integer.parseInt(matchId), player2.getUserId());
         // Lấy ClientHandler của 2 người chơi từ SessionManager
         ClientHandler handler1 = SessionManager.getSession(player1.getUsername());
         ClientHandler handler2 = SessionManager.getSession(player2.getUsername());
@@ -213,10 +226,22 @@ public class MatchController {
         }
 
         boolean isGoal = (!shooterChoice.equals(keeperChoice));
-        String resultStr = isGoal ? "GOAL" : "SAVE";
+        String resultStr = isGoal ? "goal" : "save";
 
         if (isGoal) {
             match.incrementScore(currentShooter); // Cập nhật điểm trong model Match
+        }
+        
+        try {
+            int dbMatchId = Integer.parseInt(match.getMatchId());
+            int shooterUserId = currentShooter.getUserId();
+            int shotNumber = match.getCurrentRound(); // Lấy round hiện tại làm số thứ tự cú sút
+            int direction = shooterChoice; // Lấy lựa chọn của người sút
+
+            psDAO.recordShot(dbMatchId, shooterUserId, shotNumber, direction, resultStr);
+
+        } catch (NumberFormatException e) {
+            System.err.println("Error saving shot to DB: Invalid Match ID format " + match.getMatchId());
         }
 
         System.out.println("Match [" + match.getMatchId() + "] Turn Result: Shooter(" + shooterChoice + ") vs Keeper(" + keeperChoice + ") -> " + resultStr);
@@ -290,7 +315,26 @@ public class MatchController {
             timer.cancel();
             match.setTurnTimer(null);
         }
+        
+        // luu vao csdl
+        try {
+            int dbMatchId = Integer.parseInt(match.getMatchId());
 
+            // 4.1. Cập nhật bảng 'matches' (set end_time, status)
+            matchDAO.finishMatch(dbMatchId);
+
+            // 4.2. Cập nhật điểm số cuối cùng cho cả 2 người chơi
+            mrDAO.updateScore(dbMatchId, match.getPlayer1().getUserId(), match.getPlayer1Score());
+            mrDAO.updateScore(dbMatchId, match.getPlayer2().getUserId(), match.getPlayer2Score());
+
+            // 4.3. Đánh dấu người chiến thắng (nếu có)
+            if (winner != null) {
+                mrDAO.setWinner(dbMatchId, winner.getUserId());
+            }
+
+        } catch (NumberFormatException e) {
+            System.err.println("Error saving match end to DB: Invalid Match ID format " + match.getMatchId());
+        }
         // Gửi thông báo kết thúc
         match.sendToPlayer(match.getPlayer1(), "MATCH_END:" + winnerUsername + ":" + match.getPlayer1Score() + ":" + match.getPlayer2Score());
         match.sendToPlayer(match.getPlayer2(), "MATCH_END:" + winnerUsername + ":" + match.getPlayer2Score() + ":" + match.getPlayer1Score());

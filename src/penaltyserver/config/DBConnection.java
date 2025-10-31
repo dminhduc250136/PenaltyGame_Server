@@ -13,9 +13,9 @@ import java.sql.*;
  * @author This PC
  */
 public class DBConnection {
-    private static final String URL = "jdbc:mysql://localhost:3307/penalty_game";
+    private static final String URL = "jdbc:mysql://localhost:3306/penalty_game";
     private static final String USER = "root";
-    private static final String PASS = "";
+    private static final String PASS = "25013615";
 
     /**
      * @param args the command line arguments

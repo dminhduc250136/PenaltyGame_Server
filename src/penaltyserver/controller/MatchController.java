@@ -368,26 +368,38 @@ public class MatchController {
             match.setTurnTimer(null);
         }
 
-        match.setMatchStatus("aborted"); // Đánh dấu trận bị hủy
-        match.setEndTime(new Timestamp(System.currentTimeMillis()));
-
+        // Lấy người chơi còn lại (người chiến thắng)
         User otherPlayer = match.getOtherPlayer(user);
 
-        // Gửi thông báo và xử thắng cho người còn lại
         if (otherPlayer != null) {
+            // Gửi thông báo cho người còn lại rằng đối thủ đã thoát
             ClientHandler otherHandler = SessionManager.getSession(otherPlayer.getUsername());
             if (otherHandler != null) { // Kiểm tra xem người kia còn online không
                 otherHandler.sendMessage("OPPONENT_DISCONNECTED");
-                // Gửi luôn kết quả thắng (tùy chọn)
-                // otherHandler.sendMessage("MATCH_END:" + otherPlayer.getUsername() + ":" + (otherPlayer.equals(match.getPlayer1())?match.getPlayer1Score():match.getPlayer2Score()) + ":" + (otherPlayer.equals(match.getPlayer1())?match.getPlayer2Score():match.getPlayer1Score()) );
             }
-            otherPlayer.setCurrentMatchId(null); // Reset matchId người còn lại
+
+            // Set tỉ số cứng là 5-0 cho người ở lại
+            if (otherPlayer.equals(match.getPlayer1())) {
+                match.setPlayer1Score(5);
+                match.setPlayer2Score(0);
+            } else {
+                match.setPlayer2Score(5);
+                match.setPlayer1Score(0);
+            }
+
+            // Gọi endMatch để lưu CSDL (với tỉ số 5-0) và gửi kết quả
+            // endMatch sẽ tự động dọn dẹp activeMatches và reset matchId cho cả 2
+            endMatch(match, otherPlayer); 
+
+        } else {
+            // Trường hợp hiếm: không tìm thấy người chơi kia (ví dụ: cả 2 thoát gần như cùng lúc)
+            // Chỉ dọn dẹp mà không lưu
+            activeMatches.remove(matchId);
+            user.setCurrentMatchId(null); // Reset matchId người disconnect
+            System.out.println("Match [" + matchId + "] removed. No other player found.");
         }
 
-        // Dọn dẹp
-        activeMatches.remove(matchId);
-        user.setCurrentMatchId(null); // Reset matchId người disconnect
-        System.out.println("Match [" + matchId + "] removed due to disconnect.");
+        System.out.println("Match [" + matchId + "] processed disconnect for " + user.getUsername());
     }
 
     // Inner class representing a match between two players

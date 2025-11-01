@@ -1,4 +1,4 @@
-/*
+   /*
  * To change this license header, choose License Headers in Project Properties.
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
@@ -17,27 +17,50 @@ import penaltyserver.model.UserDAO;
 import share.MatchHistoryRecord;
 import share.RankingData;
 import share.ServerListResponse;
+import share.OnlinePlayer;
 /**
  *
  * @author This PC
  */
 public class LobbyController {
     private static MatchController matchController;
-    private static UserDAO userDAO;
-    private static StatisticsDAO statisticsDAO;
+    private static UserDAO userDAO = new UserDAO();
+    private static StatisticsDAO statisticsDAO = new StatisticsDAO();;
     
     public static void setMatchController(MatchController matchController) {
         LobbyController.matchController = matchController;
     }
     
     public static void handleSendOnlineUsers(ObjectOutputStream out) throws IOException {
-        List<String> onlineUsers = SessionManager.getOnlineUsers();
-        ServerListResponse response = new ServerListResponse(ServerListResponse.UPDATE_ONLINE_USERS, onlineUsers);
+        List<RankingData> allScoreData = statisticsDAO.getLeaderboard();
+        
+        Map<String, Integer> scoreMap = new HashMap<>();
+        
+        for(RankingData data : allScoreData) {
+            scoreMap.put(data.getUsername(), data.getTotalScore());
+        }
+        
+        Collection<ClientHandler> onlineHandler = SessionManager.getSessions().values();
+        
+        
+        List<OnlinePlayer> onlinePlayerList = new ArrayList<>();
+        for(ClientHandler handler : onlineHandler) {
+            User user = handler.getAssociatedUser();
+            if(user == null) {
+                continue;
+            }
+            String username = user.getUsername();
+            String status = (user.getCurrentMatchId() == null) ? "Online" : "Busy";
+            
+            int score = scoreMap.getOrDefault(username, 0);
+            onlinePlayerList.add(new OnlinePlayer(username, status, score));
+        }
+        
+        ServerListResponse response = new ServerListResponse(ServerListResponse.UPDATE_ONLINE_USERS, onlinePlayerList);
         
         out.writeObject(response);
         out.flush();
         System.out.println("sent online list!");
-        System.out.println(onlineUsers);
     }
     
     public static void handleSendMatchHistory(ObjectOutputStream out, int userId) throws IOException {

@@ -81,7 +81,7 @@ public class ClientHandler extends Thread {
                             System.out.println(username + "đang online");
                             break;
                         case "GET_MATCH_HISTORY":
-                            LobbyController.handleSendMatchHistory(out);
+                            LobbyController.handleSendMatchHistory(out, user.getUserId());
                             break;
                         case "GET_RANKING":
                             LobbyController.handleSendRanking(out);

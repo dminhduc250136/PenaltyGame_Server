@@ -9,17 +9,13 @@ package penaltyserver.controller;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.util.*;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import penaltyserver.model.ClientHandler;
-import penaltyserver.model.Match;
-import penaltyserver.model.MatchDAO;
-import penaltyserver.model.MatchResult;
-import penaltyserver.model.MatchResultDAO;
-import penaltyserver.model.PenaltyShotDAO;
 import penaltyserver.model.SessionManager;
+import penaltyserver.model.StatisticsDAO;
 import penaltyserver.model.User;
 import penaltyserver.model.UserDAO;
+import share.MatchHistoryRecord;
+import share.RankingData;
 import share.ServerListResponse;
 /**
  *
@@ -28,6 +24,7 @@ import share.ServerListResponse;
 public class LobbyController {
     private static MatchController matchController;
     private static UserDAO userDAO;
+    private static StatisticsDAO statisticsDAO;
     
     public static void setMatchController(MatchController matchController) {
         LobbyController.matchController = matchController;
@@ -43,12 +40,22 @@ public class LobbyController {
         System.out.println(onlineUsers);
     }
     
-    public static void handleSendMatchHistory(ObjectOutputStream out) {
-        
+    public static void handleSendMatchHistory(ObjectOutputStream out, int userId) throws IOException {
+        List<MatchHistoryRecord> records = statisticsDAO.getMatchHistory(userId);
+        ServerListResponse response = new ServerListResponse(ServerListResponse.UPDATE_HISTORY, records);
+        out.writeObject(response);
+        out.flush();
+        System.out.println("sent match history records!");
     }
     
-    public static void handleSendRanking(ObjectOutputStream out) {
+    public static void handleSendRanking(ObjectOutputStream out) throws IOException {
+        List<RankingData> ranks = new ArrayList<>();
+        ranks = statisticsDAO.getLeaderboard();
         
+        ServerListResponse response = new ServerListResponse(ServerListResponse.UPDATE_RANKING, ranks);
+        out.writeObject(response);
+        out.flush();
+        System.out.println("sent ranking data!");
     }
     
     
